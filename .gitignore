@@ -1,0 +1,11 @@
+# 하위 저장소 (각자 별도 git 레포)
+/famlog-backend/
+/famlog-mobile/
+/Famlog-BE/
+/Famlog-moblie/
+/Famlog-mobile/
+/famlog-be/
+/famlog-moblie/
+
+.DS_Store
+.idea/
