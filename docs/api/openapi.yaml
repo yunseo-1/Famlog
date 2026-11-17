@@ -402,6 +402,260 @@ paths:
       summary: 권한 변경·그룹장 위임 (그룹장·관리자)
       tags:
       - group-controller
+  /api/v1/groups/{groupId}/messages:
+    get:
+      description: "afterSeq: 그 다음부터 오래된 순(재접속 동기화) / beforeSeq: 그 이전 최신 size개(위로\
+        \ 스크롤) / 둘 다 없으면 최신 size개. items는 언제나 seq 오름차순. 들어오기 전 메시지는 보이지 않는다"
+      operationId: messages
+      parameters:
+      - in: path
+        name: groupId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: query
+        name: afterSeq
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - in: query
+        name: beforeSeq
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - description: "기본 50, 최대 100"
+        in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessagePage"
+          description: OK
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 실패. code 로 원인을 구분한다
+      summary: 메시지 내역
+      tags:
+      - chat-controller
+  /api/v1/groups/{groupId}/read:
+    put:
+      description: "앞으로만 움직인다. 바뀌면 그룹에 read.updated 이벤트. STOMP /pub/groups/{groupId}/read\
+        \ 와 같다"
+      operationId: read
+      parameters:
+      - in: path
+        name: groupId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReadRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadResponse"
+          description: OK
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 실패. code 로 원인을 구분한다
+      summary: 읽음 위치 저장
+      tags:
+      - chat-controller
+  /api/v1/media/upload-urls:
+    post:
+      description: "한 번에 30개. 사진(jpeg·png·webp·heic) 30MB, 동영상(mp4·mov) 500MB·5분 이\
+        하. URL은 10분 유효, 응답의 headers 를 그대로 넣어 PUT 한다"
+      operationId: uploadUrls
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadUrlsRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadUrlsResponse"
+          description: Created
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 실패. code 로 원인을 구분한다
+      summary: 업로드 URL 발급
+      tags:
+      - media-controller
+  /api/v1/media/{mediaId}/complete:
+    post:
+      description: 파일 앞부분으로 실제 형식을 확인한다. 형식이 다르면 400(파일은 지워진다). 다시 불러도 안전하다
+      operationId: complete
+      parameters:
+      - in: path
+        name: mediaId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MediaResponse"
+          description: OK
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 실패. code 로 원인을 구분한다
+      summary: 업로드 완료
+      tags:
+      - media-controller
+  /api/v1/media/{mediaId}/content:
+    get:
+      description: 10분짜리 저장소 주소로 302. 처리가 끝난(READY) 미디어만. 썸네일은 긴 변 256(S)·720(M)·1440(L)px
+        WebP
+      operationId: content
+      parameters:
+      - in: path
+        name: mediaId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: query
+        name: variant
+        required: false
+        schema:
+          type: string
+          default: THUMB_M
+          enum:
+          - ORIGINAL
+          - THUMB_S
+          - THUMB_M
+          - THUMB_L
+      responses:
+        "200":
+          description: OK
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 실패. code 로 원인을 구분한다
+      summary: 내려받기
+      tags:
+      - media-controller
+  /api/v1/messages/{messageId}:
+    delete:
+      description: "보낸 사람만, 보낸 지 5분 안에. 아니면 403 MESSAGE_NOT_DELETABLE. 그룹에 message.deleted\
+        \ 이벤트"
+      operationId: delete_1
+      parameters:
+      - in: path
+        name: messageId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 실패. code 로 원인을 구분한다
+      summary: 모두에게서 삭제
+      tags:
+      - message-controller
+  /api/v1/messages/{messageId}/reactions:
+    post:
+      description: 한 사람당 하나. 그룹에 reaction.updated 이벤트
+      operationId: react
+      parameters:
+      - in: path
+        name: messageId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReactionRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReactionsResponse"
+          description: OK
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 실패. code 로 원인을 구분한다
+      summary: 공감 달기·바꾸기
+      tags:
+      - message-controller
+  /api/v1/messages/{messageId}/reactions/me:
+    delete:
+      description: 그룹에 reaction.updated 이벤트
+      operationId: unreact
+      parameters:
+      - in: path
+        name: messageId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReactionsResponse"
+          description: OK
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: 실패. code 로 원인을 구분한다
+      summary: 내 공감 취소
+      tags:
+      - message-controller
   /api/v1/users/me/current-group:
     put:
       description: 구성원인 그룹만. 아니면 403 GROUP_NOT_MEMBER
@@ -676,6 +930,7 @@ components:
           - AUTH_INVALID
           - GROUP_NOT_MEMBER
           - GROUP_ROLE_REQUIRED
+          - MESSAGE_NOT_DELETABLE
           - AGE_RESTRICTED
           - NOT_FOUND
           - USER_NOT_REGISTERED
@@ -731,6 +986,8 @@ components:
           format: int64
         imageKey:
           type: string
+        lastMessage:
+          $ref: "#/components/schemas/LastMessage"
         memberCount:
           type: integer
           format: int64
@@ -742,6 +999,9 @@ components:
           - OWNER
         name:
           type: string
+        unreadCount:
+          type: integer
+          format: int64
     InviteResponse:
       type: object
       properties:
@@ -763,6 +1023,33 @@ components:
           minLength: 0
       required:
       - code
+    LastMessage:
+      type: object
+      properties:
+        body:
+          type: string
+        deleted:
+          type: boolean
+        senderId:
+          type: integer
+          format: int64
+        sentAt:
+          type: string
+          format: date-time
+        seq:
+          type: integer
+          format: int64
+        type:
+          type: string
+          enum:
+          - TEXT
+          - IMAGE
+          - VIDEO
+          - VOICE
+          - PLACE
+          - SYSTEM
+          - CANDIDATE
+          - POLL
     LoginRequest:
       type: object
       properties:
@@ -776,6 +1063,42 @@ components:
       required:
       - device
       - providerToken
+    MediaResponse:
+      type: object
+      properties:
+        durationSec:
+          type: integer
+          format: int32
+        height:
+          type: integer
+          format: int32
+        id:
+          type: integer
+          format: int64
+        mediaType:
+          type: string
+          enum:
+          - IMAGE
+          - VIDEO
+        mime:
+          type: string
+        size:
+          type: integer
+          format: int64
+        status:
+          type: string
+          enum:
+          - PENDING_UPLOAD
+          - UPLOADED
+          - READY
+          - FAILED
+          - REJECTED
+        takenAt:
+          type: string
+          format: date-time
+        width:
+          type: integer
+          format: int32
     MemberResponse:
       type: object
       properties:
@@ -806,6 +1129,129 @@ components:
         userId:
           type: integer
           format: int64
+    MessagePage:
+      type: object
+      properties:
+        hasMore:
+          type: boolean
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MessageResponse"
+    MessageResponse:
+      type: object
+      properties:
+        body:
+          type: string
+        clientMessageId:
+          type: string
+        deleted:
+          type: boolean
+        groupId:
+          type: integer
+          format: int64
+        id:
+          type: integer
+          format: int64
+        media:
+          type: array
+          items:
+            $ref: "#/components/schemas/MediaResponse"
+        payload:
+          type: object
+          additionalProperties: {}
+        reactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReactionResponse"
+        replyTo:
+          $ref: "#/components/schemas/ReplyPreview"
+        senderId:
+          type: integer
+          format: int64
+        sentAt:
+          type: string
+          format: date-time
+        seq:
+          type: integer
+          format: int64
+        type:
+          type: string
+          enum:
+          - TEXT
+          - IMAGE
+          - VIDEO
+          - VOICE
+          - PLACE
+          - SYSTEM
+          - CANDIDATE
+          - POLL
+        unreadCount:
+          type: integer
+          format: int32
+    ReactionRequest:
+      type: object
+      properties:
+        emoji:
+          type: string
+          enum:
+          - HEART
+          - LIKE
+          - LAUGH
+          - WOW
+          - SAD
+          - PRAY
+      required:
+      - emoji
+    ReactionResponse:
+      type: object
+      properties:
+        emoji:
+          type: string
+          enum:
+          - HEART
+          - LIKE
+          - LAUGH
+          - WOW
+          - SAD
+          - PRAY
+        userIds:
+          type: array
+          items:
+            type: integer
+            format: int64
+    ReactionsResponse:
+      type: object
+      properties:
+        groupId:
+          type: integer
+          format: int64
+        messageId:
+          type: integer
+          format: int64
+        reactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReactionResponse"
+        seq:
+          type: integer
+          format: int64
+    ReadRequest:
+      type: object
+      properties:
+        lastReadSeq:
+          type: integer
+          format: int64
+          description: "여기까지 읽음. 앞으로만 움직이고, 방의 마지막 seq를 넘으면 마지막 seq로 맞춘다"
+          minimum: 0
+      required:
+      - lastReadSeq
+    ReadResponse:
+      type: object
+      properties:
+        lastReadSeq:
+          type: integer
+          format: int64
     RefreshRequest:
       type: object
       properties:
@@ -815,6 +1261,33 @@ components:
           minLength: 0
       required:
       - refreshToken
+    ReplyPreview:
+      type: object
+      properties:
+        body:
+          type: string
+        deleted:
+          type: boolean
+        id:
+          type: integer
+          format: int64
+        senderId:
+          type: integer
+          format: int64
+        seq:
+          type: integer
+          format: int64
+        type:
+          type: string
+          enum:
+          - TEXT
+          - IMAGE
+          - VIDEO
+          - VOICE
+          - PLACE
+          - SYSTEM
+          - CANDIDATE
+          - POLL
     SessionResponse:
       type: object
       properties:
@@ -900,6 +1373,58 @@ components:
           description: "호칭 (큰아들, 막내)"
           maxLength: 20
           minLength: 0
+    UploadItem:
+      type: object
+      properties:
+        mimeType:
+          type: string
+          minLength: 1
+        size:
+          type: integer
+          format: int64
+          exclusiveMinimum: 0
+      required:
+      - mimeType
+      - size
+    UploadTarget:
+      type: object
+      properties:
+        expiresAt:
+          type: string
+          format: date-time
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+        mediaId:
+          type: integer
+          format: int64
+        method:
+          type: string
+        uploadUrl:
+          type: string
+    UploadUrlsRequest:
+      type: object
+      properties:
+        groupId:
+          type: integer
+          format: int64
+        items:
+          type: array
+          description: 한 번에 30개까지
+          items:
+            $ref: "#/components/schemas/UploadItem"
+          minItems: 1
+      required:
+      - groupId
+      - items
+    UploadUrlsResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/UploadTarget"
     UserResponse:
       type: object
       properties:
